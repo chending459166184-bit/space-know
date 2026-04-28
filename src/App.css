@@ -362,3 +362,135 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+.home-page,
+.placeholder-page {
+  min-height: 100vh;
+  padding: 24px;
+  background:
+    linear-gradient(90deg, rgba(255, 207, 102, 0.18) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(77, 171, 247, 0.13) 1px, transparent 1px),
+    #fff7df;
+  background-size: 34px 34px;
+}
+
+.home-header,
+.placeholder-topbar,
+.shape-grid,
+.placeholder-card {
+  max-width: 1080px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.home-header h1,
+.placeholder-topbar h1 {
+  margin: 0;
+  font-size: clamp(32px, 5vw, 56px);
+  color: #26314f;
+}
+
+.home-header p {
+  margin: 10px 0 0;
+  font-size: 21px;
+  font-weight: 700;
+  color: #536079;
+}
+
+.shape-grid {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.shape-card {
+  display: grid;
+  gap: 8px;
+  text-align: left;
+  padding: 16px;
+  border: 3px solid #243047;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 6px 0 #243047;
+  color: #172033;
+  cursor: pointer;
+}
+
+.shape-card h2 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.shape-card p {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.shape-card small {
+  font-size: 16px;
+  color: #5c6880;
+}
+
+.shape-tag {
+  width: max-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.shape-tag.ready {
+  background: #d3f9d8;
+  color: #2b8a3e;
+}
+
+.shape-tag.coming {
+  background: #fff3bf;
+  color: #e67700;
+}
+
+.placeholder-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.back-btn,
+.floating-home-btn {
+  border: 3px solid #243047;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 18px;
+  font-weight: 900;
+  color: #172033;
+  box-shadow: 0 5px 0 #243047;
+  cursor: pointer;
+}
+
+.back-btn {
+  min-height: 48px;
+  padding: 0 14px;
+}
+
+.placeholder-card {
+  margin-top: 18px;
+  padding: 20px;
+  border: 3px solid #243047;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 6px 0 #243047;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.floating-home-btn {
+  position: fixed;
+  top: 18px;
+  left: 18px;
+  z-index: 60;
+  min-height: 46px;
+  padding: 0 14px;
+}
