@@ -99,6 +99,7 @@ function edgeForDirection(dir) {
 function FacePlane({ face, highlightState, onFaceClick }) {
   const style = FACE_STYLES[face.label];
   const texture = useMemo(() => makeFaceTexture(face.label, style), [face.label, style]);
+  const pointerRef = useRef({ x: 0, y: 0, moved: false, downAt: 0 });
 
   useEffect(() => () => texture.dispose(), [texture]);
 
@@ -109,7 +110,24 @@ function FacePlane({ face, highlightState, onFaceClick }) {
     <mesh
       onPointerDown={(event) => {
         event.stopPropagation();
-        onFaceClick(face.id);
+        pointerRef.current = {
+          x: event.nativeEvent.clientX,
+          y: event.nativeEvent.clientY,
+          moved: false,
+          downAt: performance.now(),
+        };
+      }}
+      onPointerMove={(event) => {
+        const dx = Math.abs(event.nativeEvent.clientX - pointerRef.current.x);
+        const dy = Math.abs(event.nativeEvent.clientY - pointerRef.current.y);
+        if (dx + dy > 6) pointerRef.current.moved = true;
+      }}
+      onPointerUp={(event) => {
+        event.stopPropagation();
+        const heldMs = performance.now() - pointerRef.current.downAt;
+        if (!pointerRef.current.moved && heldMs < 260) {
+          onFaceClick(face.id);
+        }
       }}
     >
       <planeGeometry args={[FACE_SIZE, FACE_SIZE]} />
@@ -127,7 +145,7 @@ function FacePlane({ face, highlightState, onFaceClick }) {
   );
 }
 
-function FaceNode({ faceId, netInfo, progress, manualFoldFaceId, manualFoldProgress, highlightForFace, onFaceClick }) {
+function FaceNode({ faceId, netInfo, progress, manualFoldProgressById, highlightForFace, onFaceClick }) {
   const face = netInfo.nodeById.get(faceId);
 
   return (
@@ -137,7 +155,7 @@ function FaceNode({ faceId, netInfo, progress, manualFoldFaceId, manualFoldProgr
         const child = netInfo.nodeById.get(childId);
         const hingePosition = edgeForDirection(child.dirFromParent);
         const childOffset = edgeForDirection(child.dirFromParent);
-        const childProgress = progress > 0.02 ? progress : manualFoldFaceId === childId ? manualFoldProgress : 0;
+        const childProgress = progress > 0.02 ? progress : manualFoldProgressById[childId] ?? 0;
         return (
           <group key={childId} position={hingePosition} rotation={rotationForDirection(child.dirFromParent, childProgress)}>
             <group position={childOffset}>
@@ -145,8 +163,7 @@ function FaceNode({ faceId, netInfo, progress, manualFoldFaceId, manualFoldProgr
                 faceId={childId}
                 netInfo={netInfo}
                 progress={progress}
-                manualFoldFaceId={manualFoldFaceId}
-                manualFoldProgress={manualFoldProgress}
+                manualFoldProgressById={manualFoldProgressById}
                 highlightForFace={highlightForFace}
                 onFaceClick={onFaceClick}
               />
@@ -161,8 +178,7 @@ function FaceNode({ faceId, netInfo, progress, manualFoldFaceId, manualFoldProgr
 function FoldingCube({
   netInfo,
   progress,
-  manualFoldFaceId,
-  manualFoldProgress,
+  manualFoldProgressById,
   autoRotate,
   selectedFaceId,
   guessFaceId,
@@ -198,8 +214,7 @@ function FoldingCube({
           faceId={netInfo.rootKey}
           netInfo={netInfo}
           progress={p}
-          manualFoldFaceId={manualFoldFaceId}
-          manualFoldProgress={manualFoldProgress}
+          manualFoldProgressById={manualFoldProgressById}
           highlightForFace={highlightForFace}
           onFaceClick={onFaceClick}
         />
@@ -239,9 +254,8 @@ function App() {
   const [answerText, setAnswerText] = useState('');
   const [celebrateKey, setCelebrateKey] = useState(0);
   const animationRef = useRef(null);
-  const faceAnimationRef = useRef(null);
-  const [manualFoldFaceId, setManualFoldFaceId] = useState(null);
-  const [manualFoldProgress, setManualFoldProgress] = useState(0);
+  const faceAnimationRefs = useRef({});
+  const [manualFoldProgressById, setManualFoldProgressById] = useState({});
 
   const activeNet = useMemo(() => CUBE_NETS.find((net) => net.id === netId), [netId]);
   const netInfo = useMemo(() => prepareNet(activeNet), [activeNet]);
@@ -249,12 +263,11 @@ function App() {
   const selectedOpposite = selectedFaceId ? netInfo.nodeById.get(netInfo.oppositeById[selectedFaceId]) : null;
 
   const clearManualFold = () => {
-    if (faceAnimationRef.current) {
-      cancelAnimationFrame(faceAnimationRef.current);
-      faceAnimationRef.current = null;
+    for (const rafId of Object.values(faceAnimationRefs.current)) {
+      cancelAnimationFrame(rafId);
     }
-    setManualFoldFaceId(null);
-    setManualFoldProgress(0);
+    faceAnimationRefs.current = {};
+    setManualFoldProgressById({});
   };
 
   const animateTo = (target, done) => {
@@ -279,34 +292,39 @@ function App() {
   };
 
   const animateManualFold = (faceId, target, done) => {
-    if (faceAnimationRef.current) cancelAnimationFrame(faceAnimationRef.current);
-    const start = manualFoldFaceId === faceId ? manualFoldProgress : 0;
-    setManualFoldFaceId(faceId);
+    const running = faceAnimationRefs.current[faceId];
+    if (running) cancelAnimationFrame(running);
+    const start = manualFoldProgressById[faceId] ?? 0;
     const startTime = performance.now();
     const duration = 520;
 
     const tick = (now) => {
       const t = Math.min((now - startTime) / duration, 1);
       const eased = 1 - Math.pow(1 - t, 3);
-      setManualFoldProgress(start + (target - start) * eased);
-      if (t < 1) faceAnimationRef.current = requestAnimationFrame(tick);
+      const next = start + (target - start) * eased;
+      setManualFoldProgressById((prev) => ({ ...prev, [faceId]: next }));
+      if (t < 1) faceAnimationRefs.current[faceId] = requestAnimationFrame(tick);
       else {
-        faceAnimationRef.current = null;
-        if (target < 0.02) {
-          setManualFoldFaceId(null);
-          setManualFoldProgress(0);
-        }
+        delete faceAnimationRefs.current[faceId];
+        setManualFoldProgressById((prev) => {
+          if (target >= 0.02) return { ...prev, [faceId]: 1 };
+          const nextMap = { ...prev };
+          delete nextMap[faceId];
+          return nextMap;
+        });
         done?.();
       }
     };
 
-    faceAnimationRef.current = requestAnimationFrame(tick);
+    faceAnimationRefs.current[faceId] = requestAnimationFrame(tick);
   };
 
   useEffect(
     () => () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
-      if (faceAnimationRef.current) cancelAnimationFrame(faceAnimationRef.current);
+      for (const rafId of Object.values(faceAnimationRefs.current)) {
+        cancelAnimationFrame(rafId);
+      }
     },
     [],
   );
@@ -338,7 +356,7 @@ function App() {
       }
       setGuessFaceId(null);
       setSelectedFaceId(faceId);
-      if (manualFoldFaceId === faceId && manualFoldProgress > 0.9) {
+      if ((manualFoldProgressById[faceId] ?? 0) > 0.9) {
         animateManualFold(faceId, 0, () => setAnswerText('这个面已经放下啦。'));
       } else {
         animateManualFold(faceId, 1, () => {
@@ -417,8 +435,7 @@ function App() {
               <FoldingCube
                 netInfo={netInfo}
                 progress={progress}
-                manualFoldFaceId={manualFoldFaceId}
-                manualFoldProgress={manualFoldProgress}
+                manualFoldProgressById={manualFoldProgressById}
                 autoRotate={autoRotate}
                 selectedFaceId={selectedFaceId}
                 guessFaceId={guessFaceId}
